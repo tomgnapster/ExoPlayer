@@ -20,11 +20,15 @@ import static com.google.android.exoplayer2.util.GlUtil.checkGlError;
 
 import android.opengl.GLES11Ext;
 import android.opengl.GLES20;
+
 import androidx.annotation.Nullable;
+
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.util.GlUtil;
-import java.nio.FloatBuffer;
+
 import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
+
+import java.nio.FloatBuffer;
 
 /**
  * Utility class to render spherical meshes for video or images. Call {@link #init()} on the GL
@@ -122,6 +126,7 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
   /** Initializes of the GL components. */
   /* package */ void init() {
     program = new GlUtil.Program(VERTEX_SHADER_CODE, FRAGMENT_SHADER_CODE);
+    program.use();
     mvpMatrixHandle = program.getUniformLocation("uMvpMatrix");
     uTexMatrixHandle = program.getUniformLocation("uTexMatrix");
     positionHandle = program.getAttribLocation("aPosition");

@@ -60,7 +60,7 @@ import androidx.annotation.BinderThread;
 
   // With every touch event, update the accumulated degrees offset by the new pixel amount.
   private final PointF previousTouchPointPx = new PointF();
-  private final PointF accumulatedTouchOffsetDegrees = new PointF();
+  public final PointF accumulatedTouchOffsetDegrees = new PointF();
 
   private final Listener listener;
   private final float pxPerDegrees;

@@ -25,6 +25,8 @@ import android.opengl.GLSurfaceView;
 import android.opengl.Matrix;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.Parcel;
+import android.os.Parcelable;
 import android.util.AttributeSet;
 import android.view.Display;
 import android.view.MotionEvent;
@@ -82,6 +84,7 @@ public final class SphericalGLSurfaceView extends GLSurfaceView {
   private final Handler mainHandler;
   private final TouchTracker touchTracker;
   private final SceneRenderer scene;
+  private final Renderer renderer;
   @Nullable private SurfaceTexture surfaceTexture;
   @Nullable private Surface surface;
   private boolean useSensorRotation;
@@ -114,7 +117,7 @@ public final class SphericalGLSurfaceView extends GLSurfaceView {
     this.orientationSensor = orientationSensor;
 
     scene = new SceneRenderer();
-    Renderer renderer = new Renderer(scene);
+    renderer = new Renderer(scene);
 
     touchTracker = new TouchTracker(context, renderer, PX_PER_DEGREES);
     WindowManager windowManager = (WindowManager) context.getSystemService(Context.WINDOW_SERVICE);
@@ -178,6 +181,15 @@ public final class SphericalGLSurfaceView extends GLSurfaceView {
   public void setUseSensorRotation(boolean useSensorRotation) {
     this.useSensorRotation = useSensorRotation;
     updateOrientationListenerRegistration();
+  }
+
+  public CameraState getCameraState() {
+    return new CameraState(renderer.getState(), touchTracker.accumulatedTouchOffsetDegrees);
+  }
+
+  public void setCameraState(CameraState state) {
+    touchTracker.accumulatedTouchOffsetDegrees.set(state.accumulatedPosition);
+    renderer.setState(state.rendererOrientation);
   }
 
   @Override
@@ -254,6 +266,85 @@ public final class SphericalGLSurfaceView extends GLSurfaceView {
     }
   }
 
+  public final static class CameraState implements Parcelable {
+
+    final RendererOrientation rendererOrientation;
+    final PointF accumulatedPosition = new PointF();
+
+    public CameraState(RendererOrientation rendererOrientation, PointF accumulatedPosition) {
+      this.rendererOrientation = rendererOrientation;
+      this.accumulatedPosition.set(accumulatedPosition);
+    }
+
+    protected CameraState(Parcel source) {
+      rendererOrientation = new RendererOrientation(source);
+      accumulatedPosition.readFromParcel(source);
+    }
+
+    @Override
+    public int describeContents() {
+      return 0;
+    }
+
+    @Override
+    public void writeToParcel(Parcel dest, int flags) {
+      rendererOrientation.writeToParcel(dest, flags);
+      accumulatedPosition.writeToParcel(dest, flags);
+    }
+
+    public static final Creator<CameraState> CREATOR = new Creator<CameraState>() {
+      @Override
+      public CameraState createFromParcel(Parcel source) {
+        return new CameraState(source);
+      }
+
+      @Override
+      public CameraState[] newArray(int size) {
+        return new CameraState[size];
+      }
+    };
+  }
+
+  public final static class RendererOrientation {
+    final float[] deviceOrientationMatrix = new float[16];
+    final float[] touchPitchMatrix = new float[16];
+    final float[] touchYawMatrix = new float[16];
+    float touchPitch;
+    float deviceRoll;
+
+    RendererOrientation(float[] deviceOrientationMatrix,
+                        float[] touchPitchMatrix,
+                        final float[] touchYawMatrix,
+                        float touchPitch,
+                        float deviceRoll) {
+      System.arraycopy(deviceOrientationMatrix, 0,
+              this.deviceOrientationMatrix, 0, this.deviceOrientationMatrix.length);
+      System.arraycopy(touchPitchMatrix, 0,
+              this.touchPitchMatrix, 0, this.touchPitchMatrix.length);
+      System.arraycopy(touchYawMatrix, 0,
+              this.touchYawMatrix, 0, this.touchYawMatrix.length);
+      this.touchPitch = touchPitch;
+      this.deviceRoll = deviceRoll;
+    }
+
+    RendererOrientation(Parcel source) {
+      source.readFloatArray(deviceOrientationMatrix);
+      source.readFloatArray(touchPitchMatrix);
+      source.readFloatArray(touchYawMatrix);
+      touchPitch = source.readFloat();
+      deviceRoll = source.readFloat();
+    }
+
+    public void writeToParcel(Parcel dest, int flags) {
+      dest.writeFloatArray(deviceOrientationMatrix);
+      dest.writeFloatArray(touchPitchMatrix);
+      dest.writeFloatArray(touchYawMatrix);
+      dest.writeFloat(touchPitch);
+      dest.writeFloat(deviceRoll);
+    }
+  }
+
+
   /**
    * Standard GL Renderer implementation. The notable code is the matrix multiplication in
    * onDrawFrame and updatePitchMatrix.
@@ -288,6 +379,22 @@ public final class SphericalGLSurfaceView extends GLSurfaceView {
       Matrix.setIdentityM(touchPitchMatrix, 0);
       Matrix.setIdentityM(touchYawMatrix, 0);
       deviceRoll = UPRIGHT_ROLL;
+    }
+
+    public synchronized RendererOrientation getState() {
+      return new RendererOrientation(
+              deviceOrientationMatrix, touchPitchMatrix, touchYawMatrix, touchPitch, deviceRoll);
+    }
+
+    public synchronized void setState(RendererOrientation state) {
+      System.arraycopy(state.deviceOrientationMatrix, 0,
+              deviceOrientationMatrix, 0, deviceOrientationMatrix.length);
+      System.arraycopy(state.touchPitchMatrix, 0,
+              touchPitchMatrix, 0, touchPitchMatrix.length);
+      System.arraycopy(state.touchYawMatrix, 0,
+              touchYawMatrix, 0, touchYawMatrix.length);
+      touchPitch = state.touchPitch;
+      deviceRoll = state.deviceRoll;
     }
 
     @Override
